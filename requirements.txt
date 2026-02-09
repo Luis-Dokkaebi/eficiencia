@@ -1,0 +1,8 @@
+opencv-python
+ultralytics
+supervision
+shapely
+pandas
+numpy
+plotly
+face_recognition
