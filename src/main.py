@@ -61,10 +61,12 @@ def start_video_stream():
 
     print("✅ Sistema iniciado. Presiona 'q' para salir.")
 
+    frame_count = 0
     while True:
         ret, frame = cap.read()
         if not ret:
             break
+        frame_count += 1
 
         # Detección y tracking
         detections = detector.detect(frame)
@@ -80,7 +82,16 @@ def start_video_stream():
             # Si el ID es nuevo o aún es "Unknown", intentamos reconocerlo
             current_name = track_id_to_name.get(track_id, "Unknown")
             
+            should_verify = False
             if current_name == "Unknown":
+                should_verify = True
+            else:
+                # Verificamos periódicamente para detectar cambios de identidad
+                verification_interval = getattr(config, 'VERIFICATION_INTERVAL', 30)
+                if (frame_count + track_id) % verification_interval == 0:
+                    should_verify = True
+
+            if should_verify:
                 # Intentamos reconocer la cara en este frame
                 recognized_name = face_recognizer.recognize_face(frame, bbox=(x1, y1, x2, y2))
                 
@@ -98,8 +109,13 @@ def start_video_stream():
                     # Verificamos si alcanzamos el umbral de confirmación
                     min_matches = getattr(config, 'FACE_RECOGNITION_MIN_MATCHES', 3)
                     if track_id_votes[track_id]['count'] >= min_matches:
+                        if current_name != "Unknown" and current_name != recognized_name:
+                            print(f"🔄 Cambio de identidad! ID: {track_id} era {current_name}, ahora es {recognized_name}")
+
                         track_id_to_name[track_id] = recognized_name
-                        print(f"✅ ¡Identificado! ID: {track_id} es {recognized_name} (Confirmado tras {min_matches} aciertos)")
+
+                        if current_name == "Unknown":
+                            print(f"✅ ¡Identificado! ID: {track_id} es {recognized_name} (Confirmado tras {min_matches} aciertos)")
 
             # Recuperamos el nombre actualizado para mostrarlo
             display_name = track_id_to_name.get(track_id, "Unknown")
