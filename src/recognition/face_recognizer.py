@@ -11,9 +11,10 @@ except ImportError:
     face_recognition = None
 
 class FaceRecognizer:
-    def __init__(self, faces_dir="data/faces", encodings_file="data/faces/encodings.pkl"):
+    def __init__(self, faces_dir="data/faces", encodings_file="data/faces/encodings.pkl", tolerance=0.6):
         self.faces_dir = faces_dir
         self.encodings_file = encodings_file
+        self.tolerance = tolerance
         self.known_face_encodings = []
         self.known_face_names = []
         
@@ -115,9 +116,9 @@ class FaceRecognizer:
             return "Unknown"
 
         # --- AQUÍ ESTÁ EL CAMBIO IMPORTANTE ---
-        # Agregamos tolerance=0.65 (antes era 0.6 por defecto)
-        # Esto hace que el sistema sea más flexible aceptando caras
-        matches = face_recognition.compare_faces(self.known_face_encodings, encoding, tolerance=0.65)
+        # Usamos la tolerancia configurada
+        # Esto permite ajustar qué tan estricto es el sistema
+        matches = face_recognition.compare_faces(self.known_face_encodings, encoding, tolerance=self.tolerance)
         name = "Unknown"
 
         # Use the known face with the smallest distance to the new face

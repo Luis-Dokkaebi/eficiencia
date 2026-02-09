@@ -44,13 +44,16 @@ def start_video_stream():
     db_manager = DatabaseManager(db_path=config.LOCAL_DB_PATH)
     
     # Initialize face recognizer
-    face_recognizer = FaceRecognizer()
+    face_recognizer = FaceRecognizer(tolerance=getattr(config, 'FACE_RECOGNITION_TOLERANCE', 0.6))
 
     # Track state: {track_id: {zone_name: was_inside}}
     zone_state = {}
     
     # Track names: {track_id: name}
     track_id_to_name = {}
+
+    # Track votes for recognition verification: {track_id: {'name': name, 'count': count}}
+    track_id_votes = {}
 
     # Ensure snapshots dir exists
     snapshots_dir = getattr(config, 'SNAPSHOTS_DIR', 'data/snapshots')
@@ -81,11 +84,23 @@ def start_video_stream():
                 # Intentamos reconocer la cara en este frame
                 recognized_name = face_recognizer.recognize_face(frame, bbox=(x1, y1, x2, y2))
                 
-                # Si logramos reconocerlo, actualizamos su nombre para siempre
+                # Si logramos reconocerlo, usamos sistema de votación
                 if recognized_name != "Unknown":
-                    track_id_to_name[track_id] = recognized_name
-                    print(f"✅ ¡Identificado! ID: {track_id} es {recognized_name}")
-            
+                    if track_id not in track_id_votes:
+                        track_id_votes[track_id] = {'name': recognized_name, 'count': 1}
+                    else:
+                        if track_id_votes[track_id]['name'] == recognized_name:
+                            track_id_votes[track_id]['count'] += 1
+                        else:
+                            # Reiniciamos si cambia el nombre detectado
+                            track_id_votes[track_id] = {'name': recognized_name, 'count': 1}
+
+                    # Verificamos si alcanzamos el umbral de confirmación
+                    min_matches = getattr(config, 'FACE_RECOGNITION_MIN_MATCHES', 3)
+                    if track_id_votes[track_id]['count'] >= min_matches:
+                        track_id_to_name[track_id] = recognized_name
+                        print(f"✅ ¡Identificado! ID: {track_id} es {recognized_name} (Confirmado tras {min_matches} aciertos)")
+
             # Recuperamos el nombre actualizado para mostrarlo
             display_name = track_id_to_name.get(track_id, "Unknown")
             # ------------------------------------------

@@ -16,3 +16,7 @@ SNAPSHOTS_DIR = 'data/snapshots'
 # Otros parámetros generales
 FRAME_SKIP = 1  # Capturar cada frame, ajustar para pruebas
 CONFIDENCE_THRESHOLD = 0.4
+
+# Reconocimiento Facial
+FACE_RECOGNITION_TOLERANCE = 0.5  # Menor es más estricto (0.6 es defecto, 0.5 recomendado para evitar falsos positivos)
+FACE_RECOGNITION_MIN_MATCHES = 3  # Número de veces consecutivas que debe reconocerse para confirmar identidad
