@@ -6,3 +6,10 @@ pandas
 numpy
 plotly
 face_recognition
+torch
+torchvision
+torchreid
+gdown
+tensorboard
+scipy
+scikit-learn
