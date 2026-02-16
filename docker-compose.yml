@@ -12,6 +12,60 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    networks:
+      - tracking_network
+
+  api:
+    build: .
+    command: uvicorn src.api.main:app --host 0.0.0.0 --port 8000
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-admin}:${POSTGRES_PASSWORD:-admin}@db:5432/${POSTGRES_DB:-tracking_db}
+      - CAMERAS_JSON=${CAMERAS_JSON}
+    depends_on:
+      - db
+    networks:
+      - tracking_network
+
+  dashboard:
+    build: .
+    command: streamlit run src/dashboard/app.py --server.port 8501 --server.address 0.0.0.0
+    restart: always
+    ports:
+      - "8501:8501"
+    environment:
+      - API_URL=http://api:8000
+    depends_on:
+      - api
+    networks:
+      - tracking_network
+
+  app:
+    build: .
+    command: python src/main.py
+    restart: always
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-admin}:${POSTGRES_PASSWORD:-admin}@db:5432/${POSTGRES_DB:-tracking_db}
+      - HEADLESS=true
+      - CAMERAS_JSON=${CAMERAS_JSON}
+      - REMOTE_CAMERA_URL=${REMOTE_CAMERA_URL}
+      - MODE=${MODE:-local}
+      - CONFIDENCE_THRESHOLD=${CONFIDENCE_THRESHOLD:-0.4}
+    volumes:
+      - snapshots:/app/data/snapshots
+      # Map zones config if needed, assuming it's in the image but if user wants to change it without rebuild:
+      # - ./data/zonas:/app/data/zonas
+    depends_on:
+      - db
+    networks:
+      - tracking_network
 
 volumes:
   postgres_data:
+  snapshots:
+
+networks:
+  tracking_network:
+    driver: bridge

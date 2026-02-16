@@ -67,6 +67,7 @@ SNAPSHOTS_DIR = get_env('SNAPSHOTS_DIR', 'data/snapshots')
 # General parameters
 FRAME_SKIP = get_env('FRAME_SKIP', 1, int)  # Capture every frame, adjust for testing
 CONFIDENCE_THRESHOLD = get_env('CONFIDENCE_THRESHOLD', 0.4, float)
+HEADLESS = get_env('HEADLESS', 'False').lower() == 'true'
 
 # Face Recognition
 FACE_RECOGNITION_TOLERANCE = get_env('FACE_RECOGNITION_TOLERANCE', 0.5, float)  # Lower is stricter (0.6 default, 0.5 recommended)
