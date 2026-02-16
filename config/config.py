@@ -1,23 +1,47 @@
-# --- config/config.py ---
+import os
+from dotenv import load_dotenv
 
-MODE = 'local'  # Cambiar a 'remote' cuando sea necesario
+# Load environment variables from .env file
+load_dotenv()
+
+def get_env(key, default, cast=None):
+    value = os.getenv(key)
+    if value is None:
+        return default
+    if cast:
+        try:
+            return cast(value)
+        except (ValueError, TypeError):
+            return default
+    return value
+
+MODE = get_env('MODE', 'local')  # Change to 'remote' when necessary
 
 # Video
-LOCAL_CAMERA_INDEX = 1
-REMOTE_CAMERA_URL = "rtsp://usuario:contraseña@IP:PUERTO/cam/path"
+# Special handling for LOCAL_CAMERA_INDEX: it can be int (index) or str (path)
+_local_cam = os.getenv('LOCAL_CAMERA_INDEX')
+if _local_cam is not None:
+    if _local_cam.isdigit():
+        LOCAL_CAMERA_INDEX = int(_local_cam)
+    else:
+        LOCAL_CAMERA_INDEX = _local_cam
+else:
+    LOCAL_CAMERA_INDEX = 1
 
-# Base de datos
-LOCAL_DB_PATH = 'data/db/local_tracking.db'
-REMOTE_DB_URL = 'mysql://usuario:contraseña@servidor_ip/dbname'
+REMOTE_CAMERA_URL = get_env('REMOTE_CAMERA_URL', "rtsp://usuario:contraseña@IP:PUERTO/cam/path")
+
+# Database
+LOCAL_DB_PATH = get_env('LOCAL_DB_PATH', 'data/db/local_tracking.db')
+REMOTE_DB_URL = get_env('REMOTE_DB_URL', 'mysql://usuario:contraseña@servidor_ip/dbname')
 
 # Snapshots
-SNAPSHOTS_DIR = 'data/snapshots'
+SNAPSHOTS_DIR = get_env('SNAPSHOTS_DIR', 'data/snapshots')
 
-# Otros parámetros generales
-FRAME_SKIP = 1  # Capturar cada frame, ajustar para pruebas
-CONFIDENCE_THRESHOLD = 0.4
+# General parameters
+FRAME_SKIP = get_env('FRAME_SKIP', 1, int)  # Capture every frame, adjust for testing
+CONFIDENCE_THRESHOLD = get_env('CONFIDENCE_THRESHOLD', 0.4, float)
 
-# Reconocimiento Facial
-FACE_RECOGNITION_TOLERANCE = 0.5  # Menor es más estricto (0.6 es defecto, 0.5 recomendado para evitar falsos positivos)
-FACE_RECOGNITION_MIN_MATCHES = 3  # Número de veces consecutivas que debe reconocerse para confirmar identidad
-VERIFICATION_INTERVAL = 30  # Intervalo de frames para re-verificar identidad de personas ya identificadas
+# Face Recognition
+FACE_RECOGNITION_TOLERANCE = get_env('FACE_RECOGNITION_TOLERANCE', 0.5, float)  # Lower is stricter (0.6 default, 0.5 recommended)
+FACE_RECOGNITION_MIN_MATCHES = get_env('FACE_RECOGNITION_MIN_MATCHES', 3, int)  # Consecutive recognitions to confirm identity
+VERIFICATION_INTERVAL = get_env('VERIFICATION_INTERVAL', 30, int)  # Frame interval to re-verify identity
