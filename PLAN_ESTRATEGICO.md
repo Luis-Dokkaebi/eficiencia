@@ -15,8 +15,9 @@ Actualmente, el sistema es monolítico (captura, procesamiento, lógica y visual
     - *API Server:* Gestiona la base de datos y sirve datos al frontend.
     - *Frontend:* Interfaz Web (React/Vue) para dashboard, eliminando `cv2.imshow`.
 
-### B. Despliegue (Deployment)
+### B. Despliegue (Deployment) y Empaquetado
 - **Dockerización:** Crear contenedores Docker para cada servicio. Esto asegura que el software funcione igual en el entorno de desarrollo que en el del cliente.
+- **Instalador Ejecutable:** Para clientes finales que no manejan terminales, se debe crear un instalador (.exe / .msi) que despliegue los contenedores o instale los binarios necesarios de forma transparente.
 - **Orquestación:** Usar Docker Compose para despliegues simples (1 servidor) o Kubernetes (K8s) para escalado horizontal (múltiples servidores/cámaras).
 
 ### C. Base de Datos
@@ -49,6 +50,7 @@ El objetivo es tener un sistema que pueda correr 24/7 sin fallos y con datos per
 2.  **Mes 2 [Dificultad: Alta]:** Optimización de rendimiento (TensorRT, multiprocesamiento) para soportar 4-8 cámaras por servidor.
 3.  **Mes 3 [Dificultad: Baja]:** Sistema de Alertas (Email/SMS/Telegram) y Reportes Avanzados (PDF/Excel exportables automáticamente).
 4.  **Mes 4+ [Dificultad: Alta]:** Aplicación Móvil, Integración con Nube (híbrido Edge-Cloud), Mantenimiento OTA (Over-the-Air updates).
+5.  **Mes 5+ [Dificultad: Media]:** Empaquetado final. Creación de instaladores (Inno Setup / PyInstaller) para facilitar la venta y distribución.
 
 ## 3. Siguientes Pasos Técnicos (Priorizados)
 

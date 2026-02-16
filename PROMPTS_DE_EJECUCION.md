@@ -164,6 +164,25 @@ Copia y pega el prompt completo en el chat. No saltes pasos, ya que cada uno con
 - Control de acceso granular a nivel de cámara/zona.
 ```
 
+### Paso 9: Creación de Ejecutable e Instalador (Distribución Comercial)
+**Objetivo:** Convertir el sistema en un producto instalable en Windows/Linux sin requerir conocimientos técnicos del usuario final.
+**Dificultad:** Media/Alta (⭐⭐⭐)
+
+```markdown
+**Rol:** Eres un Ingeniero de Release y Empaquetado.
+
+**Tarea:**
+1. Investiga el uso de **PyInstaller** para generar un ejecutable único (`.exe` o binario Linux) del script principal.
+   - **Nota Importante:** Debes usar `multiprocessing.freeze_support()` para compatibilidad en Windows.
+2. Crea un script de instalación (usando **Inno Setup** para Windows o un script `.sh` robusto para Linux) que:
+   - Verifique si Docker está instalado (y si no, ofrezca instalarlo o use una versión embebida de Postgres).
+   - Instale el ejecutable generado por PyInstaller.
+   - Configure el inicio automático del servicio al arrancar el sistema.
+
+**Criterios de Aceptación:**
+- Un usuario puede descargar un archivo `Setup.exe`, hacer "Siguiente > Siguiente > Instalar" y tener el sistema de visión corriendo automáticamente.
+```
+
 ---
 
 ## Próximos Pasos (Post-Ejecución)
