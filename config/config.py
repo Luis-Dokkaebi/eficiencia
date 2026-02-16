@@ -73,3 +73,8 @@ HEADLESS = get_env('HEADLESS', 'False').lower() == 'true'
 FACE_RECOGNITION_TOLERANCE = get_env('FACE_RECOGNITION_TOLERANCE', 0.5, float)  # Lower is stricter (0.6 default, 0.5 recommended)
 FACE_RECOGNITION_MIN_MATCHES = get_env('FACE_RECOGNITION_MIN_MATCHES', 3, int)  # Consecutive recognitions to confirm identity
 VERIFICATION_INTERVAL = get_env('VERIFICATION_INTERVAL', 30, int)  # Frame interval to re-verify identity
+
+# Security
+SECRET_KEY = get_env('SECRET_KEY', '09d25e094faa6ca2556c818166b7a9563b93f7099f6f0f4caa6cf63b88e8d3e7')
+ALGORITHM = get_env('ALGORITHM', 'HS256')
+ACCESS_TOKEN_EXPIRE_MINUTES = get_env('ACCESS_TOKEN_EXPIRE_MINUTES', 30, int)

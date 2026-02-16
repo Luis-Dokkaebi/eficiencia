@@ -9,7 +9,10 @@ try:
 except ImportError:
     import config
 
-from src.storage.models import Base, TrackingEvent, Snapshot
+from src.storage.models import Base, TrackingEvent, Snapshot, User
+# Import get_password_hash locally to avoid circular import issues if any
+# But we can import it at the top if we are sure
+from src.auth.security import get_password_hash
 
 class DatabaseManager:
     def __init__(self, db_url=None):
@@ -81,12 +84,15 @@ class DatabaseManager:
         finally:
             session.close()
 
-    def get_filtered_events(self, camera_id=None, limit=100, offset=0):
+    def get_filtered_events(self, camera_id=None, limit=100, offset=0, allowed_cameras=None):
         session = self.Session()
         try:
             query = session.query(TrackingEvent)
             if camera_id:
                 query = query.filter(TrackingEvent.camera_id == camera_id)
+
+            if allowed_cameras and allowed_cameras != "all":
+                query = query.filter(TrackingEvent.camera_id.in_(allowed_cameras))
 
             # Order by timestamp desc to get latest events
             query = query.order_by(TrackingEvent.timestamp.desc())
@@ -136,5 +142,46 @@ class DatabaseManager:
                     stats[cam_id] = {}
                 stats[cam_id][zone] = count
             return stats
+        finally:
+            session.close()
+
+    def get_user_by_username(self, username):
+        session = self.Session()
+        try:
+            user = session.query(User).filter(User.username == username).first()
+            if user:
+                return {
+                    "id": user.id,
+                    "username": user.username,
+                    "hashed_password": user.hashed_password,
+                    "role": user.role,
+                    "permissions": user.permissions
+                }
+            return None
+        finally:
+            session.close()
+
+    def create_user(self, username, password, role="user", permissions="[]"):
+        session = self.Session()
+        try:
+            hashed_pw = get_password_hash(password)
+            user = User(
+                username=username,
+                hashed_password=hashed_pw,
+                role=role,
+                permissions=permissions
+            )
+            session.add(user)
+            session.commit()
+            return {
+                "id": user.id,
+                "username": user.username,
+                "role": user.role,
+                "permissions": user.permissions
+            }
+        except Exception as e:
+            print(f"Error creating user: {e}")
+            session.rollback()
+            return None
         finally:
             session.close()
