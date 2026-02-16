@@ -1,67 +1,82 @@
-# src/storage/database_manager.py
-
-import sqlite3
+import sys
 import os
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
 from datetime import datetime
 
+try:
+    from config import config
+except ImportError:
+    import config
+
+from src.storage.models import Base, TrackingEvent, Snapshot
+
 class DatabaseManager:
-    def __init__(self, db_path="data/db/local_tracking.db"):
-        self.db_path = db_path
-        self._create_table()
+    def __init__(self, db_url=None):
+        if db_url is None:
+            if hasattr(config, 'DATABASE_URL'):
+                db_url = config.DATABASE_URL
+            else:
+                db_url = 'sqlite:///data/db/local_tracking.db'
 
-    def _create_table(self):
-        os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
-        conn = sqlite3.connect(self.db_path)
-        c = conn.cursor()
-        c.execute('''CREATE TABLE IF NOT EXISTS tracking (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        track_id INTEGER,
-                        timestamp TEXT,
-                        x REAL,
-                        y REAL,
-                        zone TEXT,
-                        inside_zone INTEGER
-                    )''')
-        c.execute('''CREATE TABLE IF NOT EXISTS snapshots (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        track_id INTEGER,
-                        timestamp TEXT,
-                        zone TEXT,
-                        snapshot_path TEXT
-                    )''')
-        
-        # Check for employee_name column
-        c.execute("PRAGMA table_info(snapshots)")
-        columns = [info[1] for info in c.fetchall()]
-        if 'employee_name' not in columns:
-            print("Adding employee_name column to snapshots table...")
-            c.execute("ALTER TABLE snapshots ADD COLUMN employee_name TEXT")
+        self.engine = create_engine(db_url)
+        Base.metadata.create_all(self.engine)
+        self.Session = sessionmaker(bind=self.engine)
 
-        conn.commit()
-        conn.close()
+    def insert_record(self, camera_id, track_id, x, y, zone, inside_zone):
+        session = self.Session()
+        try:
+            event = TrackingEvent(
+                camera_id=str(camera_id),
+                track_id=track_id,
+                timestamp=datetime.now(),
+                x=x,
+                y=y,
+                zone=zone,
+                inside_zone=inside_zone
+            )
+            session.add(event)
+            session.commit()
+        except Exception as e:
+            print(f"Error inserting record: {e}")
+            session.rollback()
+        finally:
+            session.close()
 
-    def insert_record(self, track_id, x, y, zone, inside_zone):
-        conn = sqlite3.connect(self.db_path)
-        c = conn.cursor()
-        timestamp = datetime.now().isoformat()
-        c.execute("INSERT INTO tracking (track_id, timestamp, x, y, zone, inside_zone) VALUES (?, ?, ?, ?, ?, ?)",
-                  (track_id, timestamp, x, y, zone, inside_zone))
-        conn.commit()
-        conn.close()
-
-    def insert_snapshot(self, track_id, zone, snapshot_path, employee_name=None):
-        conn = sqlite3.connect(self.db_path)
-        c = conn.cursor()
-        timestamp = datetime.now().isoformat()
-        c.execute("INSERT INTO snapshots (track_id, timestamp, zone, snapshot_path, employee_name) VALUES (?, ?, ?, ?, ?)",
-                  (track_id, timestamp, zone, snapshot_path, employee_name))
-        conn.commit()
-        conn.close()
+    def insert_snapshot(self, camera_id, track_id, zone, snapshot_path, employee_name=None):
+        session = self.Session()
+        try:
+            snapshot = Snapshot(
+                camera_id=str(camera_id),
+                track_id=track_id,
+                timestamp=datetime.now(),
+                zone=zone,
+                snapshot_path=snapshot_path,
+                employee_name=employee_name
+            )
+            session.add(snapshot)
+            session.commit()
+        except Exception as e:
+            print(f"Error inserting snapshot: {e}")
+            session.rollback()
+        finally:
+            session.close()
 
     def get_all_records(self):
-        conn = sqlite3.connect(self.db_path)
-        c = conn.cursor()
-        c.execute("SELECT * FROM tracking")
-        rows = c.fetchall()
-        conn.close()
-        return rows
+        session = self.Session()
+        try:
+            records = session.query(TrackingEvent).all()
+            return [
+                {
+                    'id': r.id,
+                    'camera_id': r.camera_id,
+                    'track_id': r.track_id,
+                    'timestamp': r.timestamp,
+                    'x': r.x,
+                    'y': r.y,
+                    'zone': r.zone,
+                    'inside_zone': r.inside_zone
+                } for r in records
+            ]
+        finally:
+            session.close()
