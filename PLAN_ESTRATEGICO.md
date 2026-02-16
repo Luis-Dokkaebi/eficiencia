@@ -29,37 +29,47 @@ Actualmente, el sistema es monolítico (captura, procesamiento, lógica y visual
 
 ## 2. Tiempos Estimados
 
+El orden de estas fases obedece a **dependencias técnicas** (ej. no se puede hacer una API sin una Base de Datos estable, y no vale la pena optimizar un sistema que aún no funciona correctamente).
+
 ### Fase 1: MVP (Producto Mínimo Viable) - Estabilización y Core
 **Tiempo estimado: 4-6 semanas**
 El objetivo es tener un sistema que pueda correr 24/7 sin fallos y con datos persistentes confiables.
-1.  **Semana 1-2:** Refactorización de `main.py`. Implementar manejo de errores robusto (reconexión automática de cámaras).
-2.  **Semana 3:** Migración de SQLite a PostgreSQL y diseño del esquema de base de datos definitivo.
-3.  **Semana 4:** Creación de una API básica (FastAPI) para consultar los datos.
-4.  **Semana 5-6:** Dashboard web simple (Streamlit o React básico) para ver reportes y estado en tiempo real (reemplazando `cv2.imshow`).
+1.  **Semana 1-2 [Dificultad: Alta]:** Refactorización de `main.py`. Implementar manejo de errores robusto (reconexión automática de cámaras).
+    *   *Razón:* Es el cimiento. Si el script se cae, nada más importa.
+2.  **Semana 3 [Dificultad: Media]:** Migración de SQLite a PostgreSQL y diseño del esquema de base de datos definitivo.
+    *   *Razón:* Necesario para que la API funcione rápido y soporte múltiples usuarios.
+3.  **Semana 4 [Dificultad: Media]:** Creación de una API básica (FastAPI) para consultar los datos.
+    *   *Razón:* Desacopla el backend del frontend.
+4.  **Semana 5-6 [Dificultad: Baja/Media]:** Dashboard web simple (Streamlit o React básico) para ver reportes y estado en tiempo real.
+    *   *Razón:* Reemplaza `cv2.imshow` y permite acceso remoto.
 
 ### Fase 2: Sistema Completo - Comercialización
 **Tiempo estimado: 3-6 meses (post-MVP)**
-1.  **Mes 1:** Gestión de Usuarios y Roles (Auth), Configuración remota de zonas y cámaras desde la UI.
-2.  **Mes 2:** Optimización de rendimiento (TensorRT, multiprocesamiento) para soportar 4-8 cámaras por servidor.
-3.  **Mes 3:** Sistema de Alertas (Email/SMS/Telegram) y Reportes Avanzados (PDF/Excel exportables automáticamente).
-4.  **Mes 4+:** Aplicación Móvil, Integración con Nube (híbrido Edge-Cloud), Mantenimiento OTA (Over-the-Air updates).
+1.  **Mes 1 [Dificultad: Media]:** Gestión de Usuarios y Roles (Auth), Configuración remota de zonas y cámaras desde la UI.
+2.  **Mes 2 [Dificultad: Alta]:** Optimización de rendimiento (TensorRT, multiprocesamiento) para soportar 4-8 cámaras por servidor.
+3.  **Mes 3 [Dificultad: Baja]:** Sistema de Alertas (Email/SMS/Telegram) y Reportes Avanzados (PDF/Excel exportables automáticamente).
+4.  **Mes 4+ [Dificultad: Alta]:** Aplicación Móvil, Integración con Nube (híbrido Edge-Cloud), Mantenimiento OTA (Over-the-Air updates).
 
-## 3. Siguientes Pasos Técnicos (Inmediatos)
+## 3. Siguientes Pasos Técnicos (Priorizados)
 
-Basado en el análisis del código actual (`src/main.py` y `config/config.py`), estos son los pasos concretos a seguir:
+A continuación se listan las tareas técnicas inmediatas, ordenadas por una combinación de **"Quick Wins" (Victorias Rápidas)** y **Dependencias Críticas**.
 
-1.  **Modularización del Bucle Principal:**
-    - Crear una clase `VideoStreamService` que maneje la conexión y reconexión de la cámara de forma asíncrona.
-    - Separar la lógica de "Dibujado" (`cv2.rectangle`, `cv2.text`) de la lógica de negocio. El servidor no debe gastar CPU dibujando en frames si nadie los está viendo.
+1.  **Configuración Avanzada (Quick Win)**
+    *   **Dificultad:** Baja (⭐)
+    *   **Acción:** Mover la configuración de `config.py` a variables de entorno (`.env`) o un archivo YAML/JSON.
+    *   **Beneficio:** Facilita el despliegue inmediato sin tocar código Python.
 
-2.  **Implementación de Base de Datos Real:**
-    - Levantar un contenedor de PostgreSQL.
-    - Actualizar `src/storage/database_manager.py` para usar `SQLAlchemy` o `psycopg2` en lugar de `sqlite3`.
+2.  **Modularización del Bucle Principal (Cimiento)**
+    *   **Dificultad:** Alta (⭐⭐⭐)
+    *   **Acción:** Crear `VideoStreamService` (conexión/reconexión asíncrona) y separar la lógica de "Dibujado" (`cv2.rectangle`) de la lógica de negocio.
+    *   **Beneficio:** Estabilidad. El sistema no se colgará si la cámara parpadea.
 
-3.  **API REST (FastAPI):**
-    - Crear un nuevo directorio `src/api/`.
-    - Implementar endpoints como `/api/v1/tracking/current` y `/api/v1/reports/efficiency`.
-    - Esto permitirá que cualquier frontend (Web o Móvil) consuma los datos.
+3.  **Implementación de Base de Datos Real (Infraestructura)**
+    *   **Dificultad:** Media (⭐⭐)
+    *   **Acción:** Levantar contenedor PostgreSQL y actualizar `src/storage/database_manager.py` (SQLAlchemy/psycopg2).
+    *   **Beneficio:** Escalabilidad y concurrencia real.
 
-4.  **Configuración Avanzada:**
-    - Mover la configuración de `config.py` a variables de entorno (`.env`) o un archivo YAML/JSON para facilitar el despliegue sin tocar código Python.
+4.  **API REST (Funcionalidad)**
+    *   **Dificultad:** Media (⭐⭐)
+    *   **Acción:** Crear `src/api/` con endpoints (FastAPI) para `/tracking` y `/reports`.
+    *   **Beneficio:** Permite construir cualquier frontend (Web/Móvil) sobre el sistema.
