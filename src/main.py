@@ -40,7 +40,7 @@ def main():
     print("🔧 Initializing shared resources (Detector, DB, FaceRec)...")
     try:
         detector = PersonDetector(confidence_threshold=config.CONFIDENCE_THRESHOLD)
-        db_manager = DatabaseManager(db_path=config.LOCAL_DB_PATH)
+        db_manager = DatabaseManager()
         face_recognizer = FaceRecognizer(tolerance=getattr(config, 'FACE_RECOGNITION_TOLERANCE', 0.6))
     except Exception as e:
         print(f"❌ Error initializing shared resources: {e}")
@@ -181,7 +181,7 @@ def main():
 
                             try:
                                 cv2.imwrite(filepath, frame)
-                                db_manager.insert_snapshot(global_track_id, zone_name, filepath, employee_name=display_name)
+                                db_manager.insert_snapshot(system['name'], global_track_id, zone_name, filepath, employee_name=display_name)
                                 print(f"[{system['name']}] 📸 Snapshot: {display_name} entered {zone_name}")
                             except Exception as e:
                                 print(f"Error saving snapshot: {e}")
@@ -191,6 +191,7 @@ def main():
 
                         # Record position
                         db_manager.insert_record(
+                            camera_id=system['name'],
                             track_id=global_track_id,
                             x=cx,
                             y=cy,

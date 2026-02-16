@@ -51,8 +51,15 @@ if not CAMERAS:
         CAMERAS = [REMOTE_CAMERA_URL]
 
 # Database
-LOCAL_DB_PATH = get_env('LOCAL_DB_PATH', 'data/db/local_tracking.db')
-REMOTE_DB_URL = get_env('REMOTE_DB_URL', 'mysql://usuario:contraseña@servidor_ip/dbname')
+POSTGRES_USER = get_env('POSTGRES_USER', 'admin')
+POSTGRES_PASSWORD = get_env('POSTGRES_PASSWORD', 'admin')
+POSTGRES_HOST = get_env('POSTGRES_HOST', 'localhost')
+POSTGRES_PORT = get_env('POSTGRES_PORT', '5432')
+POSTGRES_DB = get_env('POSTGRES_DB', 'tracking_db')
+
+# Construct DATABASE_URL if not provided explicitly
+_default_db_url = f"postgresql://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{POSTGRES_HOST}:{POSTGRES_PORT}/{POSTGRES_DB}"
+DATABASE_URL = get_env('DATABASE_URL', _default_db_url)
 
 # Snapshots
 SNAPSHOTS_DIR = get_env('SNAPSHOTS_DIR', 'data/snapshots')
