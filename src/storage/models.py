@@ -32,3 +32,15 @@ class Snapshot(Base):
 
     def __repr__(self):
         return f"<Snapshot(camera_id='{self.camera_id}', track_id={self.track_id}, employee_name='{self.employee_name}')>"
+
+class User(Base):
+    __tablename__ = 'users'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    username = Column(String, unique=True, index=True, nullable=False)
+    hashed_password = Column(String, nullable=False)
+    role = Column(String, default="user") # "admin", "user"
+    permissions = Column(String, default="[]") # JSON list of camera IDs, e.g., '["Camera_1", "Camera_2"]' or "all"
+
+    def __repr__(self):
+        return f"<User(username='{self.username}', role='{self.role}')>"
