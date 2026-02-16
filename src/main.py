@@ -99,10 +99,13 @@ def main():
                 
                 if frame is None:
                     # Show reconnecting status
-                    blank = np.zeros((480, 640, 3), dtype=np.uint8)
-                    msg = "Reconnecting..."
-                    cv2.putText(blank, msg, (50, 240), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
-                    cv2.imshow(system['name'], blank)
+                    if not config.HEADLESS:
+                        blank = np.zeros((480, 640, 3), dtype=np.uint8)
+                        msg = "Reconnecting..."
+                        cv2.putText(blank, msg, (50, 240), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+                        cv2.imshow(system['name'], blank)
+                    else:
+                        time.sleep(1) # Prevent tight loop if camera is down
                     continue
 
                 system['frame_count'] += 1
@@ -206,10 +209,16 @@ def main():
                     cv2.putText(frame, label, (x1, y1-10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
 
                 # Show frame
-                cv2.imshow(system['name'], frame)
+                if not config.HEADLESS:
+                    cv2.imshow(system['name'], frame)
 
-            if cv2.waitKey(1) & 0xFF == ord('q'):
-                break
+            if not config.HEADLESS:
+                if cv2.waitKey(1) & 0xFF == ord('q'):
+                    break
+            else:
+                # In headless mode, sleep slightly to prevent CPU spinning if processing is too fast
+                # and to match typical framerate if needed.
+                time.sleep(0.001)
 
     except KeyboardInterrupt:
         print("\nCreating shutdown...")
@@ -219,7 +228,8 @@ def main():
         print("🛑 Stopping all services...")
         for system in camera_systems:
             system['service'].stop()
-        cv2.destroyAllWindows()
+        if not config.HEADLESS:
+            cv2.destroyAllWindows()
         print("✅ System shutdown complete.")
 
 if __name__ == "__main__":
