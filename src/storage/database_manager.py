@@ -1,6 +1,6 @@
 import sys
 import os
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, func
 from sqlalchemy.orm import sessionmaker
 from datetime import datetime
 
@@ -78,5 +78,63 @@ class DatabaseManager:
                     'inside_zone': r.inside_zone
                 } for r in records
             ]
+        finally:
+            session.close()
+
+    def get_filtered_events(self, camera_id=None, limit=100, offset=0):
+        session = self.Session()
+        try:
+            query = session.query(TrackingEvent)
+            if camera_id:
+                query = query.filter(TrackingEvent.camera_id == camera_id)
+
+            # Order by timestamp desc to get latest events
+            query = query.order_by(TrackingEvent.timestamp.desc())
+
+            records = query.limit(limit).offset(offset).all()
+            return [
+                {
+                    'id': r.id,
+                    'camera_id': r.camera_id,
+                    'track_id': r.track_id,
+                    'timestamp': r.timestamp,
+                    'x': r.x,
+                    'y': r.y,
+                    'zone': r.zone,
+                    'inside_zone': r.inside_zone
+                } for r in records
+            ]
+        finally:
+            session.close()
+
+    def get_latest_camera_activity(self):
+        session = self.Session()
+        try:
+            # Query max timestamp per camera
+            results = session.query(
+                TrackingEvent.camera_id,
+                func.max(TrackingEvent.timestamp)
+            ).group_by(TrackingEvent.camera_id).all()
+            return {r[0]: r[1] for r in results}
+        finally:
+            session.close()
+
+    def get_zone_stats(self):
+        session = self.Session()
+        try:
+            # Count records where inside_zone=1, grouped by camera and zone
+            results = session.query(
+                TrackingEvent.camera_id,
+                TrackingEvent.zone,
+                func.count(TrackingEvent.id).label('count')
+            ).filter(TrackingEvent.inside_zone == 1)\
+             .group_by(TrackingEvent.camera_id, TrackingEvent.zone).all()
+
+            stats = {}
+            for cam_id, zone, count in results:
+                if cam_id not in stats:
+                    stats[cam_id] = {}
+                stats[cam_id][zone] = count
+            return stats
         finally:
             session.close()
