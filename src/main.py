@@ -21,6 +21,8 @@ from tracking.person_tracker import PersonTracker
 from zones.zone_checker import ZoneChecker
 from storage.database_manager import DatabaseManager
 from recognition.face_recognizer import FaceRecognizer
+from acquisition.video_stream import VideoStreamService
+import time
 
 def get_bbox_center(xyxy):
     x1, y1, x2, y2 = xyxy
@@ -35,7 +37,7 @@ def start_video_stream():
     else:
         video_source = config.REMOTE_CAMERA_URL
 
-    cap = cv2.VideoCapture(video_source)
+    cap = VideoStreamService(video_source, name="MainCamera").start()
 
     # Inicializamos los módulos
     detector = PersonDetector(confidence_threshold=config.CONFIDENCE_THRESHOLD)
@@ -63,9 +65,15 @@ def start_video_stream():
 
     frame_count = 0
     while True:
-        ret, frame = cap.read()
-        if not ret:
-            break
+        frame = cap.read()
+        if frame is None:
+            print("Reconectando... Esperando frame.")
+            # Process UI events to keep window responsive
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
+            time.sleep(0.5)
+            continue
+
         frame_count += 1
 
         # Detección y tracking
@@ -172,7 +180,7 @@ def start_video_stream():
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
 
-    cap.release()
+    cap.stop()
     cv2.destroyAllWindows()
 
 if __name__ == "__main__":
