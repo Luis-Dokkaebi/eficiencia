@@ -1,9 +1,9 @@
-# src/main.py
-
 import cv2
 import os
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 import sys
+import time
+import numpy as np
 from datetime import datetime
 
 # Add the project root directory to the python path
@@ -21,6 +21,7 @@ from tracking.person_tracker import PersonTracker
 from zones.zone_checker import ZoneChecker
 from storage.database_manager import DatabaseManager
 from recognition.face_recognizer import FaceRecognizer
+from acquisition.video_stream import VideoStreamService
 
 def get_bbox_center(xyxy):
     x1, y1, x2, y2 = xyxy
@@ -28,155 +29,197 @@ def get_bbox_center(xyxy):
     center_y = (y1 + y2) / 2
     return center_x, center_y
 
-def process_camera_stream(video_source):
-    cap = cv2.VideoCapture(video_source)
-
-    # Inicializamos los módulos
-    detector = PersonDetector(confidence_threshold=config.CONFIDENCE_THRESHOLD)
-    tracker = PersonTracker()
-    zone_checker = ZoneChecker(zones_path="data/zonas/zonas.json")
-    db_manager = DatabaseManager(db_path=config.LOCAL_DB_PATH)
+def main():
+    print("🚀 System Starting...")
     
-    # Initialize face recognizer
-    face_recognizer = FaceRecognizer(tolerance=getattr(config, 'FACE_RECOGNITION_TOLERANCE', 0.6))
+    if not config.CAMERAS:
+        print("❌ No cameras configured in config.CAMERAS.")
+        return
 
-    # Track state: {track_id: {zone_name: was_inside}}
-    zone_state = {}
-    
-    # Track names: {track_id: name}
-    track_id_to_name = {}
-
-    # Track votes for recognition verification: {track_id: {'name': name, 'count': count}}
-    track_id_votes = {}
+    # Initialize shared resources
+    print("🔧 Initializing shared resources (Detector, DB, FaceRec)...")
+    try:
+        detector = PersonDetector(confidence_threshold=config.CONFIDENCE_THRESHOLD)
+        db_manager = DatabaseManager(db_path=config.LOCAL_DB_PATH)
+        face_recognizer = FaceRecognizer(tolerance=getattr(config, 'FACE_RECOGNITION_TOLERANCE', 0.6))
+    except Exception as e:
+        print(f"❌ Error initializing shared resources: {e}")
+        return
 
     # Ensure snapshots dir exists
     snapshots_dir = getattr(config, 'SNAPSHOTS_DIR', 'data/snapshots')
     os.makedirs(snapshots_dir, exist_ok=True)
 
-    print(f"✅ Sistema iniciado para fuente: {video_source}. Presiona 'q' para salir/siguiente cámara.")
+    # Initialize camera systems
+    camera_systems = []
 
-    frame_count = 0
-    while True:
-        ret, frame = cap.read()
-        if not ret:
-            break
-        frame_count += 1
+    print(f"📷 Configuring {len(config.CAMERAS)} cameras...")
+    for i, source in enumerate(config.CAMERAS):
+        cam_name = f"Camera_{i+1}" # Underscore for filename safety
+        print(f"  - Setting up {cam_name}...")
 
-        # Detección y tracking
-        detections = detector.detect(frame)
-        tracked_detections = tracker.update(detections)
-
-        # Procesamos cada persona detectada
-        for xyxy, track_id in zip(tracked_detections.xyxy, tracked_detections.tracker_id):
-            track_id = int(track_id)
-            x1, y1, x2, y2 = map(int, xyxy)
-            cx, cy = get_bbox_center(xyxy)
-
-            # --- LÓGICA DE RECONOCIMIENTO CONSTANTE ---
-            # Si el ID es nuevo o aún es "Unknown", intentamos reconocerlo
-            current_name = track_id_to_name.get(track_id, "Unknown")
+        try:
+            # Per-camera components
+            tracker = PersonTracker()
+            # Load zones
+            zone_checker = ZoneChecker(zones_path="data/zonas/zonas.json")
             
-            should_verify = False
-            if current_name == "Unknown":
-                should_verify = True
-            else:
-                # Verificamos periódicamente para detectar cambios de identidad
-                verification_interval = getattr(config, 'VERIFICATION_INTERVAL', 30)
-                if (frame_count + track_id) % verification_interval == 0:
-                    should_verify = True
+            # Video Service
+            service = VideoStreamService(source, name=cam_name)
 
-            if should_verify:
-                # Intentamos reconocer la cara en este frame
-                recognized_name = face_recognizer.recognize_face(frame, bbox=(x1, y1, x2, y2))
+            # State tracking
+            system = {
+                'id': i,
+                'name': cam_name,
+                'service': service,
+                'tracker': tracker,
+                'zone_checker': zone_checker,
+                'zone_state': {},          # {track_id: {zone_name: was_inside}}
+                'track_id_to_name': {},    # {track_id: name}
+                'track_id_votes': {},      # {track_id: {'name': name, 'count': count}}
+                'frame_count': 0
+            }
+            camera_systems.append(system)
+        except Exception as e:
+             print(f"❌ Error setting up {cam_name}: {e}")
+
+    # Start all streams
+    print("▶️ Starting video streams...")
+    for system in camera_systems:
+        system['service'].start()
+
+    print(f"✅ System running with {len(camera_systems)} cameras. Press 'q' to exit.")
+
+    try:
+        while True:
+            # Loop over cameras
+            for system in camera_systems:
+                # 1. Get Frame
+                frame = system['service'].read()
                 
-                # Si logramos reconocerlo, usamos sistema de votación
-                if recognized_name != "Unknown":
-                    if track_id not in track_id_votes:
-                        track_id_votes[track_id] = {'name': recognized_name, 'count': 1}
+                if frame is None:
+                    # Show reconnecting status
+                    blank = np.zeros((480, 640, 3), dtype=np.uint8)
+                    msg = "Reconnecting..."
+                    cv2.putText(blank, msg, (50, 240), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+                    cv2.imshow(system['name'], blank)
+                    continue
+
+                system['frame_count'] += 1
+
+                # 2. Detect & Track
+                detections = detector.detect(frame)
+                tracked_detections = system['tracker'].update(detections)
+
+                # 3. Process each tracked person
+                for xyxy, local_track_id in zip(tracked_detections.xyxy, tracked_detections.tracker_id):
+                    local_track_id = int(local_track_id)
+
+                    # Offset ID to ensure uniqueness across cameras
+                    # e.g., Cam 0: 0-99999, Cam 1: 100000-199999
+                    global_track_id = local_track_id + (system['id'] * 100000)
+
+                    x1, y1, x2, y2 = map(int, xyxy)
+                    cx, cy = get_bbox_center(xyxy)
+
+                    # --- IDENTITY RECOGNITION LOGIC ---
+                    current_name = system['track_id_to_name'].get(global_track_id, "Unknown")
+
+                    should_verify = False
+                    if current_name == "Unknown":
+                        should_verify = True
                     else:
-                        if track_id_votes[track_id]['name'] == recognized_name:
-                            track_id_votes[track_id]['count'] += 1
-                        else:
-                            # Reiniciamos si cambia el nombre detectado
-                            track_id_votes[track_id] = {'name': recognized_name, 'count': 1}
+                        verification_interval = getattr(config, 'VERIFICATION_INTERVAL', 30)
+                        if (system['frame_count'] + local_track_id) % verification_interval == 0:
+                            should_verify = True
 
-                    # Verificamos si alcanzamos el umbral de confirmación
-                    min_matches = getattr(config, 'FACE_RECOGNITION_MIN_MATCHES', 3)
-                    if track_id_votes[track_id]['count'] >= min_matches:
-                        if current_name != "Unknown" and current_name != recognized_name:
-                            print(f"🔄 Cambio de identidad! ID: {track_id} era {current_name}, ahora es {recognized_name}")
+                    if should_verify:
+                        recognized_name = face_recognizer.recognize_face(frame, bbox=(x1, y1, x2, y2))
 
-                        track_id_to_name[track_id] = recognized_name
+                        if recognized_name != "Unknown":
+                            votes = system['track_id_votes'].get(global_track_id)
 
-                        if current_name == "Unknown":
-                            print(f"✅ ¡Identificado! ID: {track_id} es {recognized_name} (Confirmado tras {min_matches} aciertos)")
+                            # Initialize vote entry if needed
+                            if not votes:
+                                votes = {'name': recognized_name, 'count': 0}
+                                system['track_id_votes'][global_track_id] = votes
 
-            # Recuperamos el nombre actualizado para mostrarlo
-            display_name = track_id_to_name.get(track_id, "Unknown")
-            # ------------------------------------------
+                            if votes['name'] == recognized_name:
+                                votes['count'] += 1
+                            else:
+                                # Reset votes if name changes
+                                system['track_id_votes'][global_track_id] = {'name': recognized_name, 'count': 1}
 
-            results = zone_checker.check(cx, cy)
+                            min_matches = getattr(config, 'FACE_RECOGNITION_MIN_MATCHES', 3)
+                            if system['track_id_votes'][global_track_id]['count'] >= min_matches:
+                                if current_name != "Unknown" and current_name != recognized_name:
+                                    print(f"[{system['name']}] 🔄 Identity Change! ID: {global_track_id} {current_name} -> {recognized_name}")
 
-            if track_id not in zone_state:
-                zone_state[track_id] = {}
+                                system['track_id_to_name'][global_track_id] = recognized_name
 
-            for zone_name, inside in results.items():
-                inside_zone = int(inside)
-                
-                # Check for entry event (Entrada a zona)
-                was_inside = zone_state[track_id].get(zone_name, False)
-                
-                if inside_zone and not was_inside:
-                    # ACABA DE ENTRAR A LA ZONA
-                    timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-                    filename = f"{track_id}_{display_name}_{zone_name}_{timestamp_str}.jpg"
-                    filepath = os.path.join(snapshots_dir, filename)
+                                if current_name == "Unknown":
+                                    print(f"[{system['name']}] ✅ ID: {global_track_id} identified as {recognized_name}")
 
-                    try:
-                        # Guardamos la evidencia
-                        cv2.imwrite(filepath, frame)
-                        db_manager.insert_snapshot(track_id, zone_name, filepath, employee_name=display_name)
-                        print(f"📸 Foto guardada: {display_name} entró a {zone_name}")
-                    except Exception as e:
-                        print(f"Error saving snapshot: {e}")
+                    display_name = system['track_id_to_name'].get(global_track_id, "Unknown")
 
-                # Update state
-                zone_state[track_id][zone_name] = bool(inside_zone)
+                    # --- ZONE LOGIC ---
+                    results = system['zone_checker'].check(cx, cy)
 
-                # Registramos posición en la base de datos
-                db_manager.insert_record(
-                    track_id=track_id,
-                    x=cx,
-                    y=cy,
-                    zone=zone_name,
-                    inside_zone=inside_zone
-                )
+                    if global_track_id not in system['zone_state']:
+                        system['zone_state'][global_track_id] = {}
 
-                # Dibujamos bounding box y etiquetas
-                color = (0, 255, 0) if inside_zone else (0, 0, 255) # Verde si está dentro, Rojo si está fuera
-                
-                # Etiqueta: ID - Nombre - Zona - Estado
-                label = f"ID:{track_id} {display_name} [{zone_name}]"
-                
-                cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
-                cv2.putText(frame, label, (x1, y1-10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
+                    for zone_name, inside in results.items():
+                        inside_zone = int(inside)
+                        was_inside = system['zone_state'][global_track_id].get(zone_name, False)
 
-        cv2.imshow("Sistema completo en acción", frame)
+                        if inside_zone and not was_inside:
+                            # EVENT: Entered Zone
+                            timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+                            filename = f"{system['name']}_{global_track_id}_{display_name}_{zone_name}_{timestamp_str}.jpg"
+                            filename = filename.replace(" ", "_")
+                            filepath = os.path.join(snapshots_dir, filename)
 
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            break
+                            try:
+                                cv2.imwrite(filepath, frame)
+                                db_manager.insert_snapshot(global_track_id, zone_name, filepath, employee_name=display_name)
+                                print(f"[{system['name']}] 📸 Snapshot: {display_name} entered {zone_name}")
+                            except Exception as e:
+                                print(f"Error saving snapshot: {e}")
 
-    cap.release()
-    cv2.destroyAllWindows()
+                        # Update state
+                        system['zone_state'][global_track_id][zone_name] = bool(inside_zone)
 
-def main():
-    if not config.CAMERAS:
-        print("❌ No cameras configured.")
-    else:
-        for source in config.CAMERAS:
-            print(f"🚀 Starting stream for camera: {source}")
-            process_camera_stream(source)
-            print(f"🛑 Stream finished for camera: {source}")
+                        # Record position
+                        db_manager.insert_record(
+                            track_id=global_track_id,
+                            x=cx,
+                            y=cy,
+                            zone=zone_name,
+                            inside_zone=inside_zone
+                        )
+
+                    # Draw
+                    color = (0, 255, 0) if any(system['zone_state'][global_track_id].values()) else (0, 0, 255)
+                    label = f"ID:{global_track_id} {display_name}"
+                    cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
+                    cv2.putText(frame, label, (x1, y1-10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
+
+                # Show frame
+                cv2.imshow(system['name'], frame)
+
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
+
+    except KeyboardInterrupt:
+        print("\nCreating shutdown...")
+    except Exception as e:
+        print(f"❌ Unexpected error in main loop: {e}")
+    finally:
+        print("🛑 Stopping all services...")
+        for system in camera_systems:
+            system['service'].stop()
+        cv2.destroyAllWindows()
+        print("✅ System shutdown complete.")
 
 if __name__ == "__main__":
     main()
