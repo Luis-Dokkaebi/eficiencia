@@ -28,13 +28,7 @@ def get_bbox_center(xyxy):
     center_y = (y1 + y2) / 2
     return center_x, center_y
 
-def start_video_stream():
-    # Selección de fuente de video
-    if config.MODE == 'local':
-        video_source = config.LOCAL_CAMERA_INDEX
-    else:
-        video_source = config.REMOTE_CAMERA_URL
-
+def process_camera_stream(video_source):
     cap = cv2.VideoCapture(video_source)
 
     # Inicializamos los módulos
@@ -59,7 +53,7 @@ def start_video_stream():
     snapshots_dir = getattr(config, 'SNAPSHOTS_DIR', 'data/snapshots')
     os.makedirs(snapshots_dir, exist_ok=True)
 
-    print("✅ Sistema iniciado. Presiona 'q' para salir.")
+    print(f"✅ Sistema iniciado para fuente: {video_source}. Presiona 'q' para salir/siguiente cámara.")
 
     frame_count = 0
     while True:
@@ -175,5 +169,14 @@ def start_video_stream():
     cap.release()
     cv2.destroyAllWindows()
 
+def main():
+    if not config.CAMERAS:
+        print("❌ No cameras configured.")
+    else:
+        for source in config.CAMERAS:
+            print(f"🚀 Starting stream for camera: {source}")
+            process_camera_stream(source)
+            print(f"🛑 Stream finished for camera: {source}")
+
 if __name__ == "__main__":
-    start_video_stream()
+    main()
