@@ -1,6 +1,6 @@
 # Prompts de Ejecución Secuencial
 
-Este documento contiene una serie de **Prompts Maestros** diseñados para ser utilizados secuencialmente con un Asente de IA (como yo). Cada prompt corresponde a una fase crítica del `PLAN_ESTRATEGICO.md` y está optimizado para obtener resultados de código funcionales y robustos.
+Este documento contiene una serie de **Prompts Maestros** diseñados para ser utilizados secuencialmente con un Agente de IA (como yo). Cada prompt corresponde a una fase crítica del `PLAN_ESTRATEGICO.md` y está optimizado para obtener resultados de código funcionales y robustos, **con especial atención al soporte de múltiples cámaras (5, 10, 20+)**.
 
 ## Instrucciones de Uso
 Copia y pega el prompt completo en el chat. No saltes pasos, ya que cada uno construye sobre el anterior.
@@ -9,8 +9,8 @@ Copia y pega el prompt completo en el chat. No saltes pasos, ya que cada uno con
 
 ## Fase 1: Cimientos y Estabilidad (MVP)
 
-### Paso 1: Configuración Avanzada y Variables de Entorno
-**Objetivo:** Desacoplar la configuración del código fuente para facilitar despliegues.
+### Paso 1: Configuración Avanzada y Variables de Entorno (Multi-Cámara)
+**Objetivo:** Desacoplar la configuración y preparar el sistema para recibir una lista dinámica de cámaras.
 **Dificultad:** Baja (⭐)
 
 ```markdown
@@ -19,20 +19,19 @@ Copia y pega el prompt completo en el chat. No saltes pasos, ya que cada uno con
 **Tarea:**
 1. Refactoriza el manejo de configuración actual en `config/config.py`.
 2. Implementa el uso de `python-dotenv` para cargar variables sensibles desde un archivo `.env`.
-3. Crea un archivo `.env.example` con todas las variables necesarias (cámaras, base de datos, thresholds).
-4. Modifica `config.py` para leer de `os.getenv` con valores por defecto sensatos.
-5. Asegura que `src/main.py` siga funcionando sin cambios mayores, importando la nueva configuración.
+3. Crea un archivo `.env.example` que incluya una variable `CAMERAS_JSON` (una lista serializada de strings) para soportar N cámaras, no solo una.
+4. Modifica `config.py` para parsear esta lista de cámaras.
+5. Asegura que `src/main.py` iteré sobre esta lista de cámaras (aunque por ahora solo procese una o las abra secuencialmente).
 
 **Criterios de Aceptación:**
-- El archivo `.env` no debe subirse al repo (.gitignore).
-- El sistema debe iniciar correctamente leyendo las variables de entorno.
-- Si falta el `.env`, debe usar defaults seguros.
+- El archivo `.env` permite definir `["rtsp://cam1...", "rtsp://cam2...", "rtsp://cam3..."]`.
+- El sistema puede leer esta configuración correctamente al inicio.
 ```
 
 ---
 
-### Paso 2: Modularización del Servicio de Video
-**Objetivo:** Evitar que el sistema colapse si una cámara falla y separar la lógica de visión de la lógica de UI.
+### Paso 2: Modularización del Servicio de Video (Multi-Hilo)
+**Objetivo:** Evitar que el sistema colapse si una cámara falla y permitir la ingesta paralela de videos.
 **Dificultad:** Alta (⭐⭐⭐)
 
 ```markdown
@@ -40,19 +39,20 @@ Copia y pega el prompt completo en el chat. No saltes pasos, ya que cada uno con
 
 **Tarea:**
 1. Crea una clase `VideoStreamService` en `src/acquisition/video_stream.py`.
-2. Implementa la lectura de video en un hilo separado (threading) para que el buffer no se llene y cause lag.
-3. Implementa lógica de **reconexión automática**: si `cap.read()` falla, debe reintentar conectar cada X segundos sin matar el programa principal.
-4. Modifica `src/main.py` para usar `VideoStreamService` en lugar de `cv2.VideoCapture` directo.
+2. Esta clase debe instanciarse **una vez por cada cámara**.
+3. Implementa la lectura de video en un hilo separado (threading) para cada instancia.
+4. Implementa lógica de **reconexión automática**: si `cap.read()` falla en una cámara, esa instancia específica debe reintentar conectar sin bloquear a las demás cámaras.
+5. Modifica `src/main.py` para manejar una lista de objetos `VideoStreamService`.
 
 **Criterios de Aceptación:**
-- El bucle principal no debe bloquearse si la cámara se desconecta.
-- Debe mostrar un log "Reconectando..." y recuperar la imagen automáticamente cuando la cámara vuelva.
+- Si tengo 5 cámaras y desconecto la cámara 3, las cámaras 1, 2, 4 y 5 siguen procesando sin interrupciones.
+- La cámara 3 muestra logs de "Reconectando..." independientemente.
 ```
 
 ---
 
-### Paso 3: Migración a Base de Datos Robusta (PostgreSQL)
-**Objetivo:** Preparar el sistema para concurrencia y persistencia real.
+### Paso 3: Migración a Base de Datos Robusta (PostgreSQL + Identificación de Origen)
+**Objetivo:** Preparar el sistema para concurrencia masiva de datos provenientes de múltiples fuentes.
 **Dificultad:** Media (⭐⭐)
 
 ```markdown
@@ -61,19 +61,19 @@ Copia y pega el prompt completo en el chat. No saltes pasos, ya que cada uno con
 **Tarea:**
 1. Crea un archivo `docker-compose.yml` que levante un servicio de PostgreSQL 15.
 2. Instala `sqlalchemy` y `psycopg2-binary`.
-3. Refactoriza `src/storage/database_manager.py` para usar ORM (SQLAlchemy) en lugar de SQL crudo con `sqlite3`.
-4. Define los modelos (Tablas) en `src/storage/models.py`: `TrackingEvent`, `Snapshot`, `EfficiencyReport`.
+3. Refactoriza `src/storage/database_manager.py` para usar ORM (SQLAlchemy).
+4. Define los modelos (Tablas) en `src/storage/models.py`. **Crucial:** Todos los eventos (`TrackingEvent`, `Snapshot`) deben tener una columna `camera_id` o `source_id` para saber de qué cámara vino el dato.
 5. Crea un script de migración para inicializar la DB.
 
 **Criterios de Aceptación:**
-- El sistema debe poder escribir eventos en PostgreSQL corriendo en Docker.
-- `src/main.py` debe seguir funcionando, guardando datos en la nueva DB de forma transparente.
+- La base de datos guarda el identificador de la cámara junto con cada detección.
+- Soporta escrituras concurrentes de múltiples hilos sin bloquearse (Postgres maneja esto mejor que SQLite).
 ```
 
 ---
 
 ### Paso 4: Creación de API REST (Backend)
-**Objetivo:** Exponer los datos al mundo exterior (Frontend/Móvil).
+**Objetivo:** Exponer los datos agregados o filtrados por cámara.
 **Dificultad:** Media (⭐⭐)
 
 ```markdown
@@ -81,104 +81,91 @@ Copia y pega el prompt completo en el chat. No saltes pasos, ya que cada uno con
 
 **Tarea:**
 1. Crea una nueva estructura de carpetas: `src/api/`.
-2. Implementa una aplicación básica con FastAPI en `src/api/main.py`.
-3. Crea endpoints para:
-   - `GET /health`: Estado del sistema.
-   - `GET /events/latest`: Últimos 10 eventos de tracking.
-   - `GET /stats/efficiency`: Reporte agregado de eficiencia (simulado o real desde DB).
-4. Configura `uvicorn` para correr la API.
+2. Implementa endpoints en `src/api/main.py`:
+   - `GET /cameras`: Lista de cámaras activas y su estado (Online/Offline).
+   - `GET /events`: Con filtro opcional `?camera_id=X`.
+   - `GET /stats/efficiency`: Reporte agregado por zona o por cámara.
+3. Configura `uvicorn` para correr la API.
 
 **Criterios de Aceptación:**
-- Puedo hacer `curl http://localhost:8000/events/latest` y recibir un JSON con datos.
-- La API corre independientemente del script de procesamiento de video (pueden ser dos procesos distintos).
+- Puedo consultar los eventos solo de la "Cámara de la Entrada Principal".
+- La API responde rápido incluso si hay muchas cámaras escribiendo en la DB.
 ```
 
 ---
 
-### Paso 5: Dashboard Web (Frontend MVP)
-**Objetivo:** Reemplazar `cv2.imshow` y permitir monitoreo remoto.
+### Paso 5: Dashboard Web (Frontend Multi-Vista)
+**Objetivo:** Visualizar múltiples fuentes simultáneamente.
 **Dificultad:** Baja/Media (⭐⭐)
 
 ```markdown
-**Rol:** Eres un Desarrollador Frontend experto en Streamlit (o React si prefieres complejidad).
+**Rol:** Eres un Desarrollador Frontend experto en Streamlit.
 
 **Tarea:**
 1. Crea una aplicación de **Streamlit** en `src/dashboard/app.py`.
-2. La app debe conectarse a la Base de Datos (o consumir la API del paso anterior) para mostrar:
-   - Gráfico de ocupación por zona en tiempo real.
-   - Lista de últimas alertas/eventos con fotos (si las hay).
-   - KPIs de eficiencia.
-3. Agrega un botón de "Auto-refresh".
+2. Implementa un selector en la barra lateral para filtrar por "Todas las Cámaras" o una específica.
+3. Si se selecciona "Todas", muestra una cuadrícula (Grid) con los KPIs de cada cámara.
+4. Muestra gráficos comparativos de eficiencia entre diferentes cámaras/zonas.
 
 **Criterios de Aceptación:**
-- Al correr `streamlit run src/dashboard/app.py`, veo un dashboard interactivo en el navegador.
-- Los datos coinciden con lo que está detectando el sistema.
+- El operador puede ver rápidamente qué cámaras tienen más actividad.
 ```
 
 ---
 
-## Fase 2: Sistema Completo (Comercialización)
+## Fase 2: Sistema Completo (Comercialización y Escalado Masivo)
 
 ### Paso 6: Optimización con Docker para Producción
-**Objetivo:** Empaquetar todo para instalarlo en el cliente con un solo comando.
+**Objetivo:** Empaquetar todo.
 **Dificultad:** Media (⭐⭐)
 
 ```markdown
 **Rol:** Eres un Ingeniero DevOps.
 
 **Tarea:**
-1. Crea un `Dockerfile` optimizado para la aplicación (multi-stage build para reducir tamaño).
-2. Actualiza `docker-compose.yml` para incluir:
-   - Servicio `app` (Procesamiento Video).
-   - Servicio `api` (Backend).
-   - Servicio `db` (PostgreSQL).
-   - Servicio `dashboard` (Streamlit/Frontend).
-3. Configura volúmenes para persistir datos y snapshots fuera de los contenedores.
+1. Crea un `Dockerfile` optimizado.
+2. Actualiza `docker-compose.yml` para orquestar App, API, DB y Dashboard.
+3. Asegura que el contenedor de la aplicación tenga acceso a red para conectarse a cámaras RTSP externas.
 
 **Criterios de Aceptación:**
-- Ejecutando `docker-compose up -d` se levanta todo el sistema.
-- Los servicios se comunican entre sí correctamente usando nombres de host de Docker.
+- Despliegue en un comando.
 ```
 
-### Paso 7: Optimización de Inferencia (TensorRT/Multiprocessing)
-**Objetivo:** Soportar múltiples cámaras en un solo servidor.
+### Paso 7: Optimización de Inferencia (Multiprocessing Obligatorio)
+**Objetivo:** Soportar 10-20 cámaras rompiendo el cuello de botella de Python (GIL).
 **Dificultad:** Alta (⭐⭐⭐)
 
 ```markdown
 **Rol:** Eres un Ingeniero de ML Ops y Rendimiento.
 
 **Tarea:**
-1. Implementa `multiprocessing` para que cada cámara corra en su propio proceso de CPU, evitando el GIL de Python.
-2. (Opcional si hay GPU) Exporta el modelo YOLO a formato TensorRT (.engine) para inferencia ultra-rápida.
-3. Implementa un patrón Productor-Consumidor: Un proceso lee frames y los pone en una cola; otro proceso hace inferencia.
+1. El uso de `threading` (Paso 2) no es suficiente para 20 cámaras haciendo inferencia neuronal.
+2. Implementa `multiprocessing`: Cada grupo de N cámaras (ej. cada 4 cámaras) debe correr en un **Proceso independiente** con su propia instancia del modelo YOLO.
+3. Usa colas (`multiprocessing.Queue`) para centralizar los resultados y guardarlos en la DB.
+4. (Opcional) Implementa "Batch Inference": Agrupar frames de varias cámaras para pasarlos por la GPU en un solo lote.
 
 **Criterios de Aceptación:**
-- El FPS del sistema no cae linealmente al agregar una segunda cámara (escalabilidad horizontal en CPU/GPU).
+- El sistema utiliza el 100% de todos los núcleos del CPU (o GPU) disponibles.
+- Soporta 15+ cámaras con FPS estables (>10 FPS por cámara).
 ```
 
 ### Paso 8: Seguridad y Autenticación
-**Objetivo:** Proteger el acceso a los datos.
+**Objetivo:** Proteger el acceso.
 **Dificultad:** Media (⭐⭐)
 
 ```markdown
 **Rol:** Eres un experto en Ciberseguridad.
 
 **Tarea:**
-1. Implementa autenticación JWT en la API (FastAPI).
-2. Crea una tabla de `Users` en la base de datos con contraseñas hasheadas (bcrypt).
-3. Protege los endpoints del Dashboard para que requieran login.
+1. Implementa autenticación JWT y Roles de Usuario.
+2. Permite asignar permisos por cámara: "El Usuario X solo puede ver las cámaras del Almacén".
 
 **Criterios de Aceptación:**
-- No se puede acceder a `/api/events` sin un token Bearer válido.
-- El dashboard pide usuario y contraseña al entrar.
+- Control de acceso granular a nivel de cámara/zona.
 ```
 
 ---
 
 ## Próximos Pasos (Post-Ejecución)
 
-Una vez hayas completado los 8 pasos anteriores, el sistema estará funcional y listo para vender. Sin embargo, el trabajo no termina ahí. Consulta la **Sección 4** del archivo `PLAN_ESTRATEGICO.md` para detalles sobre:
-1.  Monitorización y Logs (Grafana/Loki).
-2.  Ciclo de Feedback con Clientes (Beta Testing).
-3.  Mantenimiento de Modelos (Re-entrenamiento).
-4.  Auditorías de Seguridad periódicas.
+Una vez completados los pasos, revisa la **Sección 4** del archivo `PLAN_ESTRATEGICO.md` para las tareas de mantenimiento a largo plazo.
