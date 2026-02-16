@@ -172,3 +172,13 @@ Copia y pega el prompt completo en el chat. No saltes pasos, ya que cada uno con
 - No se puede acceder a `/api/events` sin un token Bearer válido.
 - El dashboard pide usuario y contraseña al entrar.
 ```
+
+---
+
+## Próximos Pasos (Post-Ejecución)
+
+Una vez hayas completado los 8 pasos anteriores, el sistema estará funcional y listo para vender. Sin embargo, el trabajo no termina ahí. Consulta la **Sección 4** del archivo `PLAN_ESTRATEGICO.md` para detalles sobre:
+1.  Monitorización y Logs (Grafana/Loki).
+2.  Ciclo de Feedback con Clientes (Beta Testing).
+3.  Mantenimiento de Modelos (Re-entrenamiento).
+4.  Auditorías de Seguridad periódicas.

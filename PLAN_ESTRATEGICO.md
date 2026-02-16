@@ -73,3 +73,24 @@ A continuación se listan las tareas técnicas inmediatas, ordenadas por una com
     *   **Dificultad:** Media (⭐⭐)
     *   **Acción:** Crear `src/api/` con endpoints (FastAPI) para `/tracking` y `/reports`.
     *   **Beneficio:** Permite construir cualquier frontend (Web/Móvil) sobre el sistema.
+
+## 4. Fase 3: Post-Lanzamiento y Mantenimiento
+
+Una vez completados todos los pasos de desarrollo y los prompts de ejecución (`PROMPTS_DE_EJECUCION.md`), el ciclo de vida del software continúa. Estos son los pasos a seguir:
+
+1.  **Monitorización y Logs (Observabilidad):**
+    -   Implementar un sistema de logs centralizado (ej. Grafana Loki o ELK Stack) para detectar errores en tiempo real sin conectarse al servidor.
+    -   Configurar alertas automáticas si la cámara deja de enviar frames o el uso de CPU supera el 90%.
+
+2.  **Ciclo de Feedback (Mejora Continua):**
+    -   Instalar el software en un entorno piloto ("beta testers").
+    -   Recopilar falsos positivos (ej. detectar un perchero como persona) y falsos negativos.
+    -   Usar las herramientas de `src/analysis` para comparar métricas reales vs esperadas.
+
+3.  **Mantenimiento de Modelos IA:**
+    -   **Re-entrenamiento (Fine-tuning):** Si el sistema falla en condiciones específicas (ej. poca luz, uniformes de trabajo), capturar esas imágenes, etiquetarlas y re-entrenar YOLO.
+    -   Actualizar la galería de Re-identificación (ReID) periódicamente para eliminar perfiles antiguos.
+
+4.  **Auditoría de Seguridad:**
+    -   Realizar pruebas de penetración (Pentesting) básico sobre la API y el Dashboard.
+    -   Asegurar que los datos biométricos (si se guardan) cumplan con GDPR/Lopd.
