@@ -1,4 +1,5 @@
 import os
+import json
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
@@ -29,6 +30,25 @@ else:
     LOCAL_CAMERA_INDEX = 1
 
 REMOTE_CAMERA_URL = get_env('REMOTE_CAMERA_URL', "rtsp://usuario:contraseña@IP:PUERTO/cam/path")
+
+# Multi-camera support
+CAMERAS_JSON = get_env('CAMERAS_JSON', None)
+CAMERAS = []
+if CAMERAS_JSON:
+    try:
+        # We need to handle single quotes if they were used in the env var string by mistake,
+        # though valid JSON uses double quotes.
+        # However, standard dotenv usually handles strings well.
+        CAMERAS = json.loads(CAMERAS_JSON)
+    except json.JSONDecodeError:
+        print("⚠️ Error parsing CAMERAS_JSON, falling back to legacy config")
+
+if not CAMERAS:
+    # Legacy fallback
+    if MODE == 'local':
+        CAMERAS = [LOCAL_CAMERA_INDEX]
+    else:
+        CAMERAS = [REMOTE_CAMERA_URL]
 
 # Database
 LOCAL_DB_PATH = get_env('LOCAL_DB_PATH', 'data/db/local_tracking.db')
