@@ -6,7 +6,7 @@ import time
 # Ensure root is in path so we can import src modules
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from src import main as processing_main
+import src.main as processing_main
 from src.api.main import app
 
 def start_api():
