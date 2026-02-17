@@ -39,6 +39,29 @@ Al tener una reconstrucción 4D, podemos medir **velocidad y aceleración real**
 *   **Beneficio:** Alertas mucho más precisas. Podríamos definir reglas como "Si la velocidad > 3 m/s en el Pasillo A, generar alerta", eliminando falsos positivos causados por la perspectiva.
 *   **Implementación Conceptual:** Un módulo de análisis post-procesamiento que tome las trayectorias 4D generadas por D4RT y calcule vectores de física básica (velocidad, dirección) para detectar eventos de seguridad.
 
+---
+
+## 4. D4RT vs YOLO: ¿Sustituto o Complemento?
+
+**¿D4RT reemplaza a YOLO?**
+No necesariamente, y no de inmediato. Depende de la arquitectura final:
+
+1.  **Modelo Híbrido (Complemento - Más Probable a Corto Plazo):**
+    *   **YOLO (Ultralytics):** Seguiría siendo el encargado de **DETECTAR** ("¿Qué es esto?"). YOLO es extremadamente rápido y eficiente para encontrar personas en imágenes 2D.
+    *   **D4RT:** Se encargaría de **RASTREAR y RECONSTRUIR** ("¿Dónde está en el espacio y a dónde va?").
+    *   *Flujo:* YOLO detecta -> D4RT recibe la región -> D4RT calcula profundidad y movimiento 3D.
+    *   *Por qué:* D4RT puede ser computacionalmente muy costoso para escanear toda la imagen buscando objetos desde cero en tiempo real (30 FPS).
+
+2.  **Modelo Unificado (Sustituto - Futuro Ideal):**
+    *   Si D4RT (o una versión futura) es lo suficientemente rápido, podría ingerir el video crudo y devolver directamente "Objeto Person_1 en posición (x,y,z)".
+    *   En este caso, **YOLO y ByteTrack desaparecerían**, siendo reemplazados completamente por la arquitectura neuronal de D4RT.
+    *   *Desventaja:* Requiere hardware mucho más potente (GPUs de centro de datos).
+
+**Conclusión:**
+Para nuestro sistema actual, lo más viable sería usar D4RT para **reemplazar ByteTrack (el tracker)** y añadir capacidades 3D, manteniendo YOLO para la detección inicial rápida.
+
+---
+
 ## Consideraciones Técnicas
 
 *   **Recursos Computacionales:** D4RT es significativamente más pesado que modelos como YOLOv8. Requeriría hardware dedicado potente (GPUs de servidor, probablemente NVIDIA A100 o similar) para correr en tiempo real, o bien usarlo en modo "batch" para análisis forense post-evento.
