@@ -20,6 +20,7 @@ from src.tracking.person_tracker import PersonTracker
 from src.zones.zone_checker import ZoneChecker
 from src.recognition.face_recognizer import FaceRecognizer
 from src.acquisition.video_stream import VideoStreamService
+from src.paths import get_user_data_path
 
 def get_bbox_center(xyxy):
     x1, y1, x2, y2 = xyxy
@@ -65,7 +66,7 @@ class CameraGroupProcess(multiprocessing.Process):
             print(f"  - Setting up {name} in process...")
             try:
                 tracker = PersonTracker()
-                zone_checker = ZoneChecker(zones_path="data/zonas/zonas.json")
+                zone_checker = ZoneChecker(zones_path=get_user_data_path("data/zonas/zonas.json"))
                 service = VideoStreamService(source, name=name)
                 service.start() # Start the thread inside this process
 

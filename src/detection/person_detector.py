@@ -3,9 +3,12 @@
 from ultralytics import YOLO
 import numpy as np
 import supervision as sv
+from src.paths import get_bundled_resource_path
 
 class PersonDetector:
-    def __init__(self, model_path="models/yolov8/yolov8n.pt", confidence_threshold=0.4):
+    def __init__(self, model_path=None, confidence_threshold=0.4):
+        if model_path is None:
+            model_path = get_bundled_resource_path("models/yolov8/yolov8n.pt")
         self.model = YOLO(model_path)
         self.confidence_threshold = confidence_threshold
 
