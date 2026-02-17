@@ -2,9 +2,13 @@
 
 import json
 from shapely.geometry import Point, Polygon
+from src.paths import get_user_data_path
 
 class ZoneChecker:
-    def __init__(self, zones_path="data/zonas/zonas.json"):
+    def __init__(self, zones_path=None):
+        if zones_path is None:
+            zones_path = get_user_data_path("data/zonas/zonas.json")
+
         with open(zones_path, 'r') as f:
             self.zones = json.load(f)
 

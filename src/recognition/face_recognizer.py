@@ -3,6 +3,7 @@ import pickle
 import cv2
 import numpy as np
 import shutil
+from src.paths import get_user_data_path
 
 try:
     import face_recognition
@@ -11,7 +12,12 @@ except ImportError:
     face_recognition = None
 
 class FaceRecognizer:
-    def __init__(self, faces_dir="data/faces", encodings_file="data/faces/encodings.pkl", tolerance=0.6):
+    def __init__(self, faces_dir=None, encodings_file=None, tolerance=0.6):
+        if faces_dir is None:
+            faces_dir = get_user_data_path("data/faces")
+        if encodings_file is None:
+            encodings_file = get_user_data_path("data/faces/encodings.pkl")
+
         self.faces_dir = faces_dir
         self.encodings_file = encodings_file
         self.tolerance = tolerance
