@@ -7,6 +7,8 @@ Este proyecto es un sistema completo de visión por computadora para rastrear pe
 Para ejecutar este proyecto de la manera más sencilla, necesitas tener instalado:
 
 *   **Docker** y **Docker Compose** (Recomendado)
+    *   [Descargar Docker Desktop para Windows/Mac/Linux](https://www.docker.com/products/docker-desktop/)
+    *   *Nota: Docker Desktop ya incluye Docker Compose.*
 *   **Git** (para clonar el repositorio)
 
 Si prefieres ejecutarlo manualmente (sin Docker), necesitarás:
