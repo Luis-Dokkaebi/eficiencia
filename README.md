@@ -23,13 +23,23 @@ Sigue estos pasos para levantar todo el sistema (Base de datos, API, Dashboard y
 
 ### 1. Configuración del Entorno
 
-Primero, crea tu archivo de variables de entorno `.env` copiando el ejemplo proporcionado:
+Debes crear un archivo llamado `.env` en la **raíz del proyecto** (la misma carpeta donde está `docker-compose.yml`).
 
+Puedes hacerlo de dos formas:
+
+**Opción A (Terminal):**
+Ejecuta este comando para copiar el archivo de ejemplo:
 ```bash
 cp .env.example .env
 ```
 
-Abre el archivo `.env` y asegúrate de configurar las cámaras. Busca la variable `CAMERAS_JSON`:
+**Opción B (Manual - Windows/Mac):**
+1.  Busca el archivo `.env.example` en la carpeta del proyecto.
+2.  Haz una copia de ese archivo.
+3.  Renombra la copia a `.env` (asegúrate de que no termine en `.txt`).
+
+**Configuración:**
+Abre el archivo `.env` con cualquier editor de texto (Notepad, VS Code, etc.) y configura tus cámaras en la variable `CAMERAS_JSON`:
 
 ```ini
 # Ejemplo para una cámara RTSP y una webcam local (índice 0)
